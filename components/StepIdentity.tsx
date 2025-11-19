@@ -12,14 +12,14 @@ const StepIdentity = () => {
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const defaultSources = ['Employers', 'Alumni', 'Students', 'Faculty', 'External', 'Standard'];
+  const defaultSources = ['กลุ่มผู้ประกอบการ (Employers & Industry Partners)', 'ศิษย์เก่า (Alumni)', 'นักศึกษาและผู้สนใจเข้าศึกษา (Students)', 'สถานการณ์โลกและแนวโน้มสำคัญ (Global Mega Trends)', 'แผนยุทธศาสตร์/นโยบาย (Strategic)', 'มาตรฐานที่เกี่ยวข้อง (Standards)'];
   const allSources = [...defaultSources, ...(state.customSources || [])];
 
   const handleAddStakeholder = () => {
     if (!newStakeholder.description) return;
     addStakeholder({
       id: Date.now().toString(),
-      source: newStakeholder.source || 'Employers',
+      source: newStakeholder.source || 'กลุ่มผู้ประกอบการ (Employers & Industry Partners)',
       description: newStakeholder.description || ''
     });
     setNewStakeholder({ ...newStakeholder, description: '' });
