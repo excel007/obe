@@ -1,10 +1,64 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Course, CLO, StakeholderInput, PLO } from "../types";
 
-// Initialize client
+// --- Configuration ---
+// Initialize Google GenAI with API Key from environment variable
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const modelName = "gemini-2.5-flash";
+
+// --- Helpers ---
+
+// 1. Clean JSON string (remove markdown fences if present)
+const cleanJSON = (text: string): string => {
+  if (!text) return "[]";
+  return text.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
+};
+
+// 2. Robustly extract an array from AI response
+const extractArray = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object' && data !== null) {
+    const values = Object.values(data);
+    for (const val of values) {
+      if (Array.isArray(val)) return val;
+    }
+  }
+  return [];
+};
+
+// 3. Wait function for backoff
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// 4. Retry operation with exponential backoff
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>, 
+  retries = 3, 
+  delay = 2000
+): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error: any) {
+    const message = (error?.message || '').toLowerCase();
+    
+    // Check for common errors
+    const isOverloaded = 
+      message.includes('429') || 
+      message.includes('503') ||
+      message.includes('quota') ||
+      message.includes('resource_exhausted') ||
+      message.includes('overloaded') ||
+      message.includes('unavailable');
+    
+    if (retries > 0 && isOverloaded) {
+      console.warn(`⚠️ AI Service Busy. Retrying in ${delay}ms... (${retries} left)`);
+      await wait(delay);
+      return retryWithBackoff(operation, retries - 1, delay * 2);
+    }
+    
+    console.error("❌ Final AI Error:", error);
+    throw error;
+  }
+};
 
 // --- 1. PLO Suggestion ---
 export const suggestPLOs = async (
@@ -38,14 +92,17 @@ export const suggestPLOs = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || "[]");
+    }));
+    
+    const text = response.text;
+    const parsed = JSON.parse(cleanJSON(text || "[]"));
+    return extractArray(parsed);
   } catch (error) {
-    console.error("AI PLO Suggestion Error:", error);
+    console.error("AI PLO Suggestion Logic Error:", error);
     throw error;
   }
 };
@@ -72,12 +129,15 @@ export const suggestYLOs = async (degree: string, programName: string): Promise<
     ]
   `;
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || "[]");
+    }));
+
+    const text = response.text;
+    const parsed = JSON.parse(cleanJSON(text || "[]"));
+    return extractArray(parsed);
   } catch (error) {
     console.error("AI YLO Suggestion Error:", error);
     throw error;
@@ -120,12 +180,14 @@ export const generateCourseContent = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || "{}");
+    }));
+
+    const text = response.text;
+    return JSON.parse(cleanJSON(text || "{}"));
   } catch (error) {
     console.error("AI Course Content Error:", error);
     throw error;
@@ -161,12 +223,15 @@ export const suggestGapFillingCourses = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || "[]");
+    }));
+
+    const text = response.text;
+    const parsed = JSON.parse(cleanJSON(text || "[]"));
+    return extractArray(parsed);
   } catch (error) {
     console.error("AI Gap Analysis Error:", error);
     throw error;
@@ -191,12 +256,14 @@ export const suggestModuleCourses = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || "[]");
+    }));
+
+    const text = response.text;
+    return JSON.parse(cleanJSON(text || "[]"));
   } catch (error) {
     console.error("AI Module Suggestion Error:", error);
     return [];

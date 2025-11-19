@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useCurriculum } from '../context/CurriculumContext';
-import { Card, Button } from './ui/Elements';
+import { Card } from './ui/Elements';
 import { CourseCategory } from '../types';
 
 const StepMapping = () => {
@@ -75,7 +74,7 @@ const StepMapping = () => {
             </table>
           </Card>
       ) : (
-          <div className="bg-slate-900 rounded-lg p-8 overflow-x-auto min-h-[500px]">
+          <div className="bg-white border border-slate-200 rounded-lg p-8 overflow-x-auto min-h-[500px]">
               <div className="flex flex-col gap-8">
                   {state.plos.map(plo => {
                       const mapped = sortedCourses.filter(c => c.mappedPLOs?.includes(plo.id));
@@ -93,9 +92,9 @@ const StepMapping = () => {
                               {/* Course Nodes */}
                               <div className="ml-8 flex flex-wrap gap-4 items-center border-l-2 border-blue-500 pl-8 py-2">
                                   {mapped.map(c => (
-                                      <div key={c.id} className="bg-slate-800 border border-slate-600 text-slate-200 p-2 rounded w-40 hover:bg-slate-700 transition-colors">
-                                          <div className="font-mono font-bold text-yellow-400 text-xs">{c.code}</div>
-                                          <div className="text-xs truncate">{c.nameTH}</div>
+                                      <div key={c.id} className="bg-slate-100 border border-slate-300 text-slate-800 p-2 rounded w-48 hover:bg-slate-200 transition-colors shadow-sm">
+                                          <div className="font-mono font-bold text-blue-700 text-xs">{c.code}</div>
+                                          <div className="text-xs">{c.nameTH}</div>
                                           <div className="text-[10px] text-slate-500 mt-1">{c.category}</div>
                                       </div>
                                   ))}

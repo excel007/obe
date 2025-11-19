@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useCurriculum } from '../context/CurriculumContext';
 import { Card } from './ui/Elements';
@@ -169,7 +168,7 @@ const StepRelations = () => {
                                {subItems.map(c => (
                                    <div key={c.id} className="border p-2 rounded min-w-[120px] text-center bg-slate-50">
                                        <div className="font-bold text-slate-800 text-sm">{c.code}</div>
-                                       <div className="text-xs text-slate-500 truncate w-32 mx-auto">{c.nameTH}</div>
+                                       <div className="text-xs text-slate-500 w-32 mx-auto">{c.nameTH}</div>
                                    </div>
                                ))}
                            </div>

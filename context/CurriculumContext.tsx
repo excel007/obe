@@ -59,7 +59,7 @@ interface CurriculumContextType {
 
 const CurriculumContext = createContext<CurriculumContextType | undefined>(undefined);
 
-export const CurriculumProvider = ({ children }: { children: ReactNode }) => {
+export const CurriculumProvider = ({ children }: React.PropsWithChildren<{}>) => {
   const [state, setState] = useState<CurriculumState>(initialState);
   const [currentStep, setCurrentStep] = useState<Step>('IDENTITY');
 

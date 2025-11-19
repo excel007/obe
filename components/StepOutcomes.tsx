@@ -74,7 +74,8 @@ const StepOutcomes = () => {
         }));
         setSuggestedPLOs(formattedSuggestions);
     } catch (error) {
-        alert("Failed to generate suggestions. Please try again.");
+        console.error(error);
+        alert("Failed to generate suggestions. The AI model might be overloaded, please wait a moment and try again.");
     } finally {
         setIsSuggestingPLO(false);
     }
@@ -98,16 +99,21 @@ const StepOutcomes = () => {
     setIsSuggestingYLO(true);
     try {
         const results = await suggestYLOs(state.info.degreeLevel, state.info.nameTH);
-        results.forEach((y: any) => {
-            addYLO({
-                id: `YLO-${Date.now()}-${y.year}`,
-                year: y.year,
-                description: y.description,
-                mappedPLOs: []
-            })
-        });
+        if(results && results.length > 0) {
+            results.forEach((y: any, idx: number) => {
+                addYLO({
+                    id: `YLO-${Date.now()}-${y.year}-${idx}`, // Added index to prevent duplicate IDs in fast loops
+                    year: y.year,
+                    description: y.description,
+                    mappedPLOs: []
+                })
+            });
+        } else {
+            alert("AI returned empty suggestions.");
+        }
     } catch (e) {
-        alert("Failed to suggest YLOs");
+        console.error(e);
+        alert("Failed to suggest YLOs. The AI model might be overloaded, please wait a moment and try again.");
     } finally {
         setIsSuggestingYLO(false);
     }
