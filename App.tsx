@@ -16,7 +16,7 @@ const STEPS: { id: Step; label: string; icon: string }[] = [
   { id: 'IDENTITY', label: '1. ข้อมูลพื้นฐาน', icon: '🏫' },
   { id: 'OUTCOMES', label: '2. ผลลัพธ์ (PLOs)', icon: '🎯' },
   { id: 'NEEDS_MAPPING', label: '3. ความสัมพันธ์ Needs', icon: '🏗' },
-  { id: 'STRUCTURE', label: '4. โครงสร้างวิชา', icon: '📚' },
+  { id: 'STRUCTURE', label: '4. โครงสร้างหลักสูตร', icon: '📚' },
   { id: 'PLANNING', label: '5. แผนการเรียน', icon: '📅' },
   { id: 'MAPPING', label: '6. ความสัมพันธ์ PLO/CLO', icon: '🔗' },
   { id: 'RELATIONS', label: '7. ความสัมพันธ์ PLO/YLO', icon: '🕸' },

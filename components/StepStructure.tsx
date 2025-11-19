@@ -256,7 +256,7 @@ const StepStructure = () => {
   return (
     <div className="space-y-6 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-xl font-bold text-slate-800">3. โครงสร้างหลักสูตร (Curriculum Structure)</h2>
+        <h2 className="text-xl font-bold text-slate-800">4. โครงสร้างหลักสูตร (Curriculum Structure)</h2>
         <div className="flex flex-wrap gap-2 items-center bg-slate-100 p-2 rounded-lg">
             <select 
                 className="text-xs p-1 rounded border-slate-300" 

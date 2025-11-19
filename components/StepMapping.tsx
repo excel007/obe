@@ -20,7 +20,7 @@ const StepMapping = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-slate-800">5. ความสัมพันธ์ PLO/CLO (Mapping Matrix)</h2>
+          <h2 className="text-xl font-bold text-slate-800">6. ความสัมพันธ์ PLO/CLO (Mapping Matrix)</h2>
           <div className="flex bg-slate-200 rounded p-1">
               <button 
                 className={`px-3 py-1 rounded text-xs font-medium ${viewMode === 'TABLE' ? 'bg-white shadow text-blue-600' : 'text-slate-600'}`}
@@ -84,7 +84,7 @@ const StepMapping = () => {
                               {/* PLO Node */}
                               <div className="w-48 shrink-0 p-4 bg-blue-600 text-white rounded-lg shadow-lg z-10 relative">
                                   <div className="font-bold text-lg">{plo.code}</div>
-                                  <div className="text-xs opacity-90 mt-1">{plo.description.substring(0, 50)}...</div>
+                                  <div className="text-xs opacity-90 mt-1">{plo.description}...</div>
                                   {/* Line connector */}
                                   <div className="absolute top-1/2 right-[-32px] w-8 h-0.5 bg-blue-500"></div>
                               </div>

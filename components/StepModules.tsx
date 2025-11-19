@@ -63,7 +63,7 @@ const StepModules = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h2 className="text-xl font-bold text-slate-800">7. จัดชุดวิชา (Modules)</h2>
+        <h2 className="text-xl font-bold text-slate-800">8. จัดชุดวิชา (Modules)</h2>
         <div className="flex bg-slate-200 rounded p-1">
              <button onClick={() => setViewMode('TABLE')} className={`px-3 py-1 rounded text-xs font-bold ${viewMode==='TABLE' ? 'bg-white shadow' : ''}`}>Table</button>
              <button onClick={() => setViewMode('LIST')} className={`px-3 py-1 rounded text-xs font-bold ${viewMode==='LIST' ? 'bg-white shadow' : ''}`}>List</button>

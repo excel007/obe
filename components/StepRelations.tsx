@@ -133,7 +133,10 @@ const StepRelations = () => {
                                 </td>
                                 <td className="px-4 py-2 border align-top">
                                     <div className="flex flex-wrap gap-1">
-                                        {courses.map(c => <span key={c.id} className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">{c.code}</span>)}
+                                        {courses.map(c => <span key={c.id} className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">                                        
+                                <div className="font-bold text-slate-800 text-sm">{c.code}</div>
+                                       <div className="text-xs text-slate-500 w-32 mx-auto">{c.nameTH}</div>                                        
+                                        </span>)}
                                     </div>
                                 </td>
                             </tr>
@@ -182,7 +185,7 @@ const StepRelations = () => {
   return (
     <div className="space-y-6">
        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-slate-800">6. ความสัมพันธ์ PLO/YLO/CLO (Derived Logic)</h2>
+          <h2 className="text-xl font-bold text-slate-800">7. ความสัมพันธ์ PLO/YLO/CLO (Derived Logic)</h2>
           <div className="flex gap-4">
              <div className="flex bg-slate-200 rounded p-1">
                 <button onClick={() => setRootType('PLO')} className={`px-3 py-1 rounded text-xs font-bold ${rootType==='PLO' ? 'bg-white shadow' : ''}`}>PLO Root</button>
