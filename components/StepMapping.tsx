@@ -86,7 +86,6 @@ const StepMapping = () => {
                               <div className="w-48 shrink-0 p-4 bg-blue-600 text-white rounded-lg shadow-lg z-10 relative">
                                   <div className="font-bold text-lg">{plo.code}</div>
                                   <div className="text-xs opacity-90 mt-1">{plo.description}...</div>
-                                  {/* Line connector removed as requested */}
                               </div>
 
                               {/* Course Nodes */}
