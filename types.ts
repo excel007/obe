@@ -80,12 +80,23 @@ export interface Module {
   prerequisites: Record<string, string[]>; // CourseID -> [PrereqCourseID]
 }
 
+export interface CreditStructure {
+    total: number;
+    genEd: number;
+    core: number; // 2.1
+    majorReq: number; // 2.2.1
+    majorElec: number; // 2.2.2
+    fieldExp: number; // 2.2.3
+    freeElec: number; // 2.3
+}
+
 export interface CurriculumState {
   info: {
     nameTH: string;
     nameEN: string;
     degreeLevel: string;
     totalCredits: number;
+    creditStructure: CreditStructure;
   };
   stakeholders: StakeholderInput[];
   customSources: string[]; // Store user-defined categories
@@ -97,4 +108,4 @@ export interface CurriculumState {
   modules: Module[];
 }
 
-export type Step = 'IDENTITY' | 'OUTCOMES' | 'NEEDS_MAPPING' | 'STRUCTURE' | 'PLANNING' | 'MAPPING' | 'RELATIONS' | 'MODULES';
+export type Step = 'IDENTITY' | 'OUTCOMES' | 'NEEDS_MAPPING' | 'STRUCTURE' | 'PLANNING' | 'MAPPING' | 'RELATIONS' | 'MODULES' | 'REPORT';

@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { useCurriculum } from '../context/CurriculumContext';
 import { Button, Input, Card, Spinner, Badge, Modal, Textarea } from './ui/Elements';
 import { CourseCategory, Course } from '../types';
-import { suggestGapFillingCourses } from '../services/geminiService';
+import { suggestGapFillingCourses, suggestSmartMapping } from '../services/geminiService';
+import { openPrintWindow } from '../services/printService';
 
 const StepStructure = () => {
   const { state, addCourse, loadState, updateCourse } = useCurriculum();
@@ -20,14 +21,17 @@ const StepStructure = () => {
   });
 
   const [isFillingGaps, setIsFillingGaps] = useState(false);
-  const [editingCourseId, setEditingCourseId] = useState<string | null>(null); // For PLO mapping modal
+  const [isAutoMapping, setIsAutoMapping] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [targetImportCategory, setTargetImportCategory] = useState<CourseCategory>(CourseCategory.GEN_ED);
+  
+  // Collapsible State
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   const categoriesList = Object.values(CourseCategory);
 
   const handleAddCourse = () => {
     if (!newCourse.code || !newCourse.nameTH) return;
-    
     addCourse({
         id: `C-${Date.now()}`,
         code: newCourse.code!,
@@ -40,16 +44,7 @@ const StepStructure = () => {
         descriptionEN: newCourse.descriptionEN || '',
         mappedPLOs: newCourse.mappedPLOs || []
     });
-
-    setNewCourse({
-        ...newCourse,
-        code: '',
-        nameTH: '',
-        nameEN: '',
-        descriptionTH: '',
-        descriptionEN: '',
-        mappedPLOs: []
-    });
+    setNewCourse({ ...newCourse, code: '', nameTH: '', nameEN: '', descriptionTH: '', descriptionEN: '', mappedPLOs: [] });
   };
 
   const removeCourse = (id: string) => {
@@ -61,9 +56,7 @@ const StepStructure = () => {
 
   const moveCourse = (id: string, targetCat: CourseCategory) => {
     const course = state.courses.find(c => c.id === id);
-    if(course) {
-        updateCourse(id, { category: targetCat });
-    }
+    if(course) updateCourse(id, { category: targetCat });
   }
 
   const handleFillGaps = async () => {
@@ -78,7 +71,7 @@ const StepStructure = () => {
                 nameTH: s.nameTH,
                 nameEN: s.nameEN,
                 credits: s.credits,
-                category: CourseCategory.MAJOR_ELEC, // Target 2.2.2
+                category: CourseCategory.MAJOR_ELEC,
                 clos: [],
                 descriptionTH: s.justification, 
                 descriptionEN: s.justification,
@@ -90,6 +83,41 @@ const StepStructure = () => {
     } finally {
         setIsFillingGaps(false);
     }
+  };
+
+  const handleAutoMapping = async () => {
+      // Filter: Unmapped 2.2 courses (Core, MajorReq, MajorElec, Field)
+      // Actually, request said "2.2 Specific Major" which usually means Specific Courses.
+      // Let's target the sub-categories of 2.2: Core(2.1), MajorReq(2.2.1), MajorElec(2.2.2), Field(2.2.3)
+      const targetCats = [CourseCategory.CORE, CourseCategory.MAJOR_REQ, CourseCategory.MAJOR_ELEC, CourseCategory.FIELD_EXP];
+      
+      const coursesToMap = state.courses.filter(c => 
+          targetCats.includes(c.category) && (!c.mappedPLOs || c.mappedPLOs.length === 0)
+      );
+
+      if(coursesToMap.length === 0) {
+          alert("No unmapped courses found in Category 2.");
+          return;
+      }
+
+      setIsAutoMapping(true);
+      try {
+          const mappings = await suggestSmartMapping(coursesToMap, state.plos);
+          mappings.forEach(m => {
+              if (m.ploIds && m.ploIds.length > 0) {
+                  updateCourse(m.courseId, { mappedPLOs: m.ploIds });
+              }
+          });
+          alert(`Auto-mapped ${mappings.length} courses successfully.`);
+      } catch (e) {
+          alert("Auto Mapping failed.");
+      } finally {
+          setIsAutoMapping(false);
+      }
+  };
+
+  const toggleSection = (key: string) => {
+      setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleDownloadTemplate = () => {
@@ -105,11 +133,10 @@ const StepStructure = () => {
   const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if(!file) return;
-      
       const reader = new FileReader();
       reader.onload = (event) => {
           const text = event.target?.result as string;
-          const lines = text.split('\n').slice(1); // skip header
+          const lines = text.split('\n').slice(1);
           lines.forEach(line => {
               const [code, nameTH, nameEN, credits, descTH, descEN] = line.split(',');
               if(code && nameTH) {
@@ -129,31 +156,64 @@ const StepStructure = () => {
           alert("Imported successfully into " + targetImportCategory);
       };
       reader.readAsText(file);
-      e.target.value = ''; // reset
+      e.target.value = '';
   };
 
-  // Mapping Modal Logic
   const togglePloMapping = (courseId: string, ploId: string) => {
       const course = state.courses.find(c => c.id === courseId);
       if(!course) return;
       const currentMaps = course.mappedPLOs || [];
-      const newMaps = currentMaps.includes(ploId) 
-        ? currentMaps.filter(id => id !== ploId)
-        : [...currentMaps, ploId];
+      const newMaps = currentMaps.includes(ploId) ? currentMaps.filter(id => id !== ploId) : [...currentMaps, ploId];
       updateCourse(courseId, { mappedPLOs: newMaps });
   };
 
-  // Calculate Credits helper
+  const handlePrintStructure = () => {
+      let html = `<h2 class="text-2xl font-bold text-center mb-2">${state.info.nameTH}</h2>`;
+      html += `<h3 class="text-xl text-center mb-8 text-slate-600">${state.info.nameEN}</h3>`;
+      
+      // Helper to render a category block
+      const renderCatBlock = (title: string, cat?: CourseCategory) => {
+          let block = `<div class="mb-6"><h4 class="font-bold text-lg mb-2 bg-slate-100 p-1 border-b border-black">${title}</h4>`;
+          if (cat) {
+              const courses = state.courses.filter(c => c.category === cat);
+              if(courses.length > 0) {
+                  block += `<ul class="list-disc pl-6 space-y-1">`;
+                  courses.forEach(c => {
+                      block += `<li><b>${c.code}</b> ${c.nameTH} ${c.nameEN ? `(${c.nameEN})` : ''} <span class="text-sm font-mono">[${c.credits} หน่วยกิต]</span></li>`;
+                  });
+                  block += `</ul>`;
+              } else {
+                  block += `<p class="italic text-slate-400 text-sm ml-4">ไม่มีรายวิชา</p>`;
+              }
+          }
+          block += `</div>`;
+          return block;
+      };
+
+      // 1. Gen Ed
+      html += renderCatBlock("1. หมวดวิชาศึกษาทั่วไป", CourseCategory.GEN_ED);
+      
+      // 2. Specific
+      html += `<div class="mb-6"><h4 class="font-bold text-lg mb-2 bg-slate-800 text-white p-1">2. หมวดวิชาเฉพาะ</h4>`;
+      html += `<div class="pl-4 border-l-2 border-slate-300">`;
+        html += renderCatBlock("2.1 กลุ่มวิชาพื้นฐานวิชาชีพ", CourseCategory.CORE);
+        html += renderCatBlock("2.2.1 กลุ่มวิชาบังคับ", CourseCategory.MAJOR_REQ);
+        html += renderCatBlock("2.2.2 กลุ่มวิชาเลือก", CourseCategory.MAJOR_ELEC);
+        html += renderCatBlock("2.2.3 กลุ่มวิชาฝึกประสบการณ์ฯ", CourseCategory.FIELD_EXP);
+      html += `</div></div>`;
+
+      // 3. Free Elective
+      html += renderCatBlock("3. หมวดวิชาเลือกเสรี", CourseCategory.FREE_ELEC);
+
+      openPrintWindow("โครงสร้างหลักสูตร", html);
+  };
+
   const getCredits = (category: CourseCategory) => {
-      return state.courses
-          .filter(c => c.category === category)
-          .reduce((sum, c) => sum + c.credits, 0);
+      return state.courses.filter(c => c.category === category).reduce((sum, c) => sum + (c.credits || 0), 0);
   };
 
   const renderCourseList = (category: CourseCategory) => {
       const courses = state.courses.filter(c => c.category === category);
-      const totalCredits = courses.reduce((sum, c) => sum + c.credits, 0);
-
       return (
           <div className="p-4 bg-white border border-t-0 border-slate-200 rounded-b-lg mb-4">
               {courses.length === 0 ? <p className="text-slate-400 text-sm text-center py-2">ไม่มีรายวิชา</p> : (
@@ -169,44 +229,20 @@ const StepStructure = () => {
                               </div>
                               <p className="text-sm font-medium text-slate-800 truncate" title={c.nameTH}>{c.nameTH}</p>
                               <p className="text-xs text-slate-500 truncate mb-2">{c.nameEN}</p>
-                              
-                              {/* Footer: Badges (Left) & Actions (Right) */}
                               <div className="mt-auto pt-2 border-t border-slate-100 flex justify-between items-end gap-2">
-                                  
-                                  {/* PLO Badges */}
                                   <div className="flex flex-wrap gap-1 cursor-pointer flex-1" onClick={() => setEditingCourseId(c.id)} title="Click to map PLOs">
                                       {c.mappedPLOs && c.mappedPLOs.length > 0 ? c.mappedPLOs.map(pid => {
                                           const plo = state.plos.find(p => p.id === pid);
-                                          if (!plo) return null;
-                                          const num = plo.code.replace(/\D/g, '');
-                                          return (
-                                              <Badge key={pid} color="blue" title={plo.description}>PLO{num}</Badge>
-                                          )
+                                          return plo ? <Badge key={pid} color="blue" title={plo.description}>PLO{plo.code.replace(/\D/g, '')}</Badge> : null;
                                       }) : <span className="text-[10px] text-slate-300 border border-dashed px-1 rounded hover:bg-slate-50">+ Map</span>}
                                   </div>
-
-                                  {/* Move Actions */}
                                   <div className="flex flex-col gap-1 items-end shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                      {category === CourseCategory.MAJOR_REQ && (
-                                          <button onClick={() => moveCourse(c.id, CourseCategory.MAJOR_ELEC)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">
-                                              Move to 2.2.2 &darr;
-                                          </button>
-                                      )}
-                                      {category === CourseCategory.MAJOR_ELEC && (
-                                          <>
-                                            <button onClick={() => moveCourse(c.id, CourseCategory.MAJOR_REQ)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">
-                                                Move to 2.2.1 &uarr;
-                                            </button>
-                                            <button onClick={() => moveCourse(c.id, CourseCategory.FIELD_EXP)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">
-                                                Move to 2.2.3 &darr;
-                                            </button>
-                                          </>
-                                      )}
-                                      {category === CourseCategory.FIELD_EXP && (
-                                          <button onClick={() => moveCourse(c.id, CourseCategory.MAJOR_ELEC)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">
-                                              Move to 2.2.2 &uarr;
-                                          </button>
-                                      )}
+                                      {category === CourseCategory.MAJOR_REQ && <button onClick={() => moveCourse(c.id, CourseCategory.MAJOR_ELEC)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">Move to 2.2.2 &darr;</button>}
+                                      {category === CourseCategory.MAJOR_ELEC && <>
+                                            <button onClick={() => moveCourse(c.id, CourseCategory.MAJOR_REQ)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">Move to 2.2.1 &uarr;</button>
+                                            <button onClick={() => moveCourse(c.id, CourseCategory.FIELD_EXP)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">Move to 2.2.3 &darr;</button>
+                                      </>}
+                                      {category === CourseCategory.FIELD_EXP && <button onClick={() => moveCourse(c.id, CourseCategory.MAJOR_ELEC)} className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 font-bold">Move to 2.2.2 &uarr;</button>}
                                   </div>
                               </div>
                           </div>
@@ -217,30 +253,42 @@ const StepStructure = () => {
       )
   };
 
-  const renderHeader = (title: string, category?: CourseCategory, customTotal?: number) => {
+  const renderHeader = (key: string, title: string, category?: CourseCategory, customTotal?: number) => {
       let total = customTotal;
-      if (category && customTotal === undefined) {
-          total = getCredits(category);
-      }
+      if (category && customTotal === undefined) total = getCredits(category);
+      const isCollapsed = collapsedSections[key];
+
       return (
-        <div className="bg-slate-800 text-white px-4 py-2 rounded-t-lg font-bold mt-4 flex justify-between items-center">
-            <span>{title}</span>
-            {total !== undefined && <span className="bg-slate-700 px-2 py-0.5 rounded text-xs text-yellow-300 font-mono">รวม {total} หน่วยกิต</span>}
+        <div className="mt-4">
+            <div className="bg-slate-800 text-white px-4 py-2 rounded-t-lg font-bold flex justify-between items-center cursor-pointer hover:bg-slate-700" onClick={() => toggleSection(key)}>
+                <div className="flex items-center gap-2">
+                    <span>{isCollapsed ? '►' : '▼'}</span>
+                    <span>{title}</span>
+                </div>
+                {total !== undefined && <span className="bg-slate-700 px-2 py-0.5 rounded text-xs text-yellow-300 font-mono">รวม {total} หน่วยกิต</span>}
+            </div>
+            {!isCollapsed && category && renderCourseList(category)}
         </div>
       );
   };
 
-  const renderSubHeader = (title: string, category: CourseCategory) => {
+  const renderSubHeader = (key: string, title: string, category: CourseCategory) => {
       const total = getCredits(category);
+      const isCollapsed = collapsedSections[key];
       return (
-        <div className="bg-slate-100 px-4 py-2 font-bold text-sm text-slate-600 flex justify-between items-center border-l-4 border-slate-300">
-            <span>{title}</span>
-            <span className="text-slate-500 text-xs">[{total} หน่วยกิต]</span>
+        <div className="mt-2">
+            <div className="bg-slate-100 px-4 py-2 font-bold text-sm text-slate-600 flex justify-between items-center border-l-4 border-slate-300 cursor-pointer hover:bg-slate-200" onClick={() => toggleSection(key)}>
+                <div className="flex items-center gap-2">
+                    <span>{isCollapsed ? '►' : '▼'}</span>
+                    <span>{title}</span>
+                </div>
+                <span className="text-slate-500 text-xs">[{total} หน่วยกิต]</span>
+            </div>
+            {!isCollapsed && renderCourseList(category)}
         </div>
       );
   };
 
-  // Calculate Totals for Summary
   const crGenEd = getCredits(CourseCategory.GEN_ED);
   const crCore = getCredits(CourseCategory.CORE);
   const crMajorReq = getCredits(CourseCategory.MAJOR_REQ);
@@ -250,26 +298,32 @@ const StepStructure = () => {
   
   const crSpecific = crCore + crMajorReq + crMajorElec + crField;
   const crSpecificMajor = crMajorReq + crMajorElec + crField;
-  
   const crTotalCalculated = crGenEd + crSpecific + crFree;
+
+  // Standard (Target) Credits from State (default 0 if not set)
+  const std = state.info.creditStructure || { total: 0, genEd: 0, core: 0, majorReq: 0, majorElec: 0, fieldExp: 0, freeElec: 0 };
 
   return (
     <div className="space-y-6 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-xl font-bold text-slate-800">4. โครงสร้างหลักสูตร (Curriculum Structure)</h2>
-        <div className="flex flex-wrap gap-2 items-center bg-slate-100 p-2 rounded-lg">
-            <select 
-                className="text-xs p-1 rounded border-slate-300" 
-                value={targetImportCategory}
-                onChange={(e) => setTargetImportCategory(e.target.value as CourseCategory)}
-            >
-                {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <label className="cursor-pointer bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs px-3 py-1 rounded flex items-center gap-1">
-                <span>📂 Import CSV</span>
-                <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
-            </label>
-            <Button variant="ghost" onClick={handleDownloadTemplate} className="text-xs">⬇ Template</Button>
+        
+        <div className="flex flex-wrap gap-2 items-center">
+            {/* Print Button */}
+            <Button onClick={handlePrintStructure} variant="primary" className="text-sm">
+                🖨 พิมพ์โครงสร้างหลักสูตร
+            </Button>
+
+            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg">
+                <select className="text-xs p-1 rounded border-slate-300" value={targetImportCategory} onChange={(e) => setTargetImportCategory(e.target.value as CourseCategory)}>
+                    {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <label className="cursor-pointer bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs px-3 py-1 rounded flex items-center gap-1">
+                    <span>📂 Import CSV</span>
+                    <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
+                </label>
+                <Button variant="ghost" onClick={handleDownloadTemplate} className="text-xs">⬇ Template</Button>
+            </div>
         </div>
       </div>
 
@@ -283,11 +337,7 @@ const StepStructure = () => {
             <div className="lg:col-span-2"><Input label="Course Name (EN)" value={newCourse.nameEN} onChange={(e:any)=>setNewCourse({...newCourse, nameEN: e.target.value})} /></div>
             <div className="lg:col-span-2">
                 <label className="text-sm font-medium text-slate-700">หมวดวิชา</label>
-                <select 
-                    className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
-                    value={newCourse.category}
-                    onChange={(e)=>setNewCourse({...newCourse, category: e.target.value as CourseCategory})}
-                >
+                <select className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm" value={newCourse.category} onChange={(e)=>setNewCourse({...newCourse, category: e.target.value as CourseCategory})}>
                     {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
             </div>
@@ -311,42 +361,40 @@ const StepStructure = () => {
         </Button>
       </div>
 
-      {/* Course Structure Visualization */}
       <div className="space-y-1">
         {/* 1. GEN ED */}
-        {renderHeader(CourseCategory.GEN_ED, CourseCategory.GEN_ED)}
-        {renderCourseList(CourseCategory.GEN_ED)}
+        {renderHeader("GEN_ED", "1. หมวดวิชาศึกษาทั่วไป", CourseCategory.GEN_ED)}
 
         {/* 2. Specific */}
-        {renderHeader("2. หมวดวิชาเฉพาะ", undefined, crSpecific)}
-        <div className="border-l-4 border-slate-800 ml-2 pl-2">
-            {/* 2.1 Core */}
-            <div className="bg-slate-200 text-slate-800 px-4 py-2 font-bold flex justify-between">
-                <span>{CourseCategory.CORE}</span>
-                <span className="text-sm text-slate-600">[{crCore} หน่วยกิต]</span>
+        {renderHeader("SPECIFIC", "2. หมวดวิชาเฉพาะ", undefined, crSpecific)}
+        {!collapsedSections["SPECIFIC"] && (
+            <div className="border-l-4 border-slate-800 ml-2 pl-2">
+                {/* 2.2 Header with Auto Mapping Button */}
+                <div className="flex items-center justify-between bg-slate-200 px-4 py-2 mb-2 rounded-t">
+                     <span className="font-bold text-slate-800">2.2 วิชาเฉพาะด้าน (Core & Major)</span>
+                     <Button 
+                        variant="secondary" 
+                        className="text-xs h-7 py-0" 
+                        title="เฉพาะรายวิชาที่ยังไม่มีการ Mapping กับ PLO"
+                        onClick={handleAutoMapping}
+                        disabled={isAutoMapping}
+                     >
+                        {isAutoMapping ? <><Spinner/> Auto Mapping...</> : '⚡ PLO Auto Mapping'}
+                     </Button>
+                </div>
+                
+                {renderSubHeader("CORE", CourseCategory.CORE, CourseCategory.CORE)}
+                
+                <div className="border-l-4 border-slate-300 ml-2 pl-2">
+                     {renderSubHeader("MAJOR_REQ", CourseCategory.MAJOR_REQ, CourseCategory.MAJOR_REQ)}
+                     {renderSubHeader("MAJOR_ELEC", CourseCategory.MAJOR_ELEC, CourseCategory.MAJOR_ELEC)}
+                     {renderSubHeader("FIELD_EXP", CourseCategory.FIELD_EXP, CourseCategory.FIELD_EXP)}
+                </div>
             </div>
-            {renderCourseList(CourseCategory.CORE)}
-
-            {/* 2.2 Specific Major */}
-            <div className="bg-slate-200 text-slate-800 px-4 py-2 font-bold flex justify-between">
-                <span>2.2 วิชาเฉพาะด้าน</span>
-                <span className="text-sm text-slate-600">[{crSpecificMajor} หน่วยกิต]</span>
-            </div>
-            <div className="border-l-4 border-slate-300 ml-2 pl-2">
-                 {renderSubHeader(CourseCategory.MAJOR_REQ, CourseCategory.MAJOR_REQ)}
-                 {renderCourseList(CourseCategory.MAJOR_REQ)}
-
-                 {renderSubHeader(CourseCategory.MAJOR_ELEC, CourseCategory.MAJOR_ELEC)}
-                 {renderCourseList(CourseCategory.MAJOR_ELEC)}
-
-                 {renderSubHeader(CourseCategory.FIELD_EXP, CourseCategory.FIELD_EXP)}
-                 {renderCourseList(CourseCategory.FIELD_EXP)}
-            </div>
-        </div>
+        )}
 
         {/* 2.3 Free Elec */}
-        {renderHeader(CourseCategory.FREE_ELEC, CourseCategory.FREE_ELEC)}
-        {renderCourseList(CourseCategory.FREE_ELEC)}
+        {renderHeader("FREE_ELEC", "3. หมวดวิชาเลือกเสรี", CourseCategory.FREE_ELEC)}
       </div>
 
       {/* Credit Summary Table */}
@@ -357,14 +405,14 @@ const StepStructure = () => {
                   <thead className="bg-slate-100 text-slate-700 font-bold">
                       <tr>
                           <th className="px-4 py-3 border-b">หมวดวิชา</th>
-                          <th className="px-4 py-3 border-b text-center w-40">เกณฑ์ (Standard)</th>
+                          <th className="px-4 py-3 border-b text-center w-40">หน่วยกิตที่กำหนด (Standard)</th>
                           <th className="px-4 py-3 border-b text-center w-40 text-blue-700">ที่จัดได้ (Actual)</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                       <tr>
                           <td className="px-4 py-2 font-bold">1. หมวดวิชาศึกษาทั่วไป</td>
-                          <td className="px-4 py-2 text-center text-slate-500">24</td>
+                          <td className="px-4 py-2 text-center text-slate-500">{std.genEd}</td>
                           <td className="px-4 py-2 text-center font-bold text-blue-700">{crGenEd}</td>
                       </tr>
                       <tr className="bg-slate-50">
@@ -374,7 +422,7 @@ const StepStructure = () => {
                       </tr>
                       <tr>
                           <td className="px-4 py-2 pl-8">2.1 กลุ่มวิชาพื้นฐานวิชาชีพ</td>
-                          <td className="px-4 py-2 text-center text-slate-500">-</td>
+                          <td className="px-4 py-2 text-center text-slate-500">{std.core}</td>
                           <td className="px-4 py-2 text-center">{crCore}</td>
                       </tr>
                       <tr>
@@ -384,28 +432,28 @@ const StepStructure = () => {
                       </tr>
                       <tr>
                           <td className="px-4 py-2 pl-12 text-slate-600">2.2.1 กลุ่มวิชาบังคับ</td>
-                          <td className="px-4 py-2 text-center text-slate-500">-</td>
+                          <td className="px-4 py-2 text-center text-slate-500">{std.majorReq}</td>
                           <td className="px-4 py-2 text-center">{crMajorReq}</td>
                       </tr>
                       <tr>
                           <td className="px-4 py-2 pl-12 text-slate-600">2.2.2 กลุ่มวิชาเลือก</td>
-                          <td className="px-4 py-2 text-center text-slate-500">-</td>
+                          <td className="px-4 py-2 text-center text-slate-500">{std.majorElec}</td>
                           <td className="px-4 py-2 text-center">{crMajorElec}</td>
                       </tr>
                       <tr>
-                          <td className="px-4 py-2 pl-12 text-slate-600">2.2.3 กลุ่มวิชาฝึกประสบการณ์วิชาชีพ</td>
-                          <td className="px-4 py-2 text-center text-slate-500">-</td>
+                          <td className="px-4 py-2 pl-12 text-slate-600">2.2.3 กลุ่มวิชาฝึกประสบการณ์ฯ</td>
+                          <td className="px-4 py-2 text-center text-slate-500">{std.fieldExp}</td>
                           <td className="px-4 py-2 text-center">{crField}</td>
                       </tr>
                       <tr className="bg-slate-50">
                           <td className="px-4 py-2 font-bold">3. หมวดวิชาเลือกเสรี</td>
-                          <td className="px-4 py-2 text-center text-slate-500">6</td>
+                          <td className="px-4 py-2 text-center text-slate-500">{std.freeElec}</td>
                           <td className="px-4 py-2 text-center font-bold text-blue-700">{crFree}</td>
                       </tr>
                       <tr className="bg-slate-800 text-white">
                           <td className="px-4 py-3 font-bold text-right">รวมหน่วยกิตตลอดหลักสูตร</td>
-                          <td className="px-4 py-3 text-center font-bold">{state.info.totalCredits}</td>
-                          <td className={`px-4 py-3 text-center font-bold ${crTotalCalculated >= state.info.totalCredits ? 'text-green-400' : 'text-yellow-400'}`}>
+                          <td className="px-4 py-3 text-center font-bold">{std.total}</td>
+                          <td className={`px-4 py-3 text-center font-bold ${crTotalCalculated >= std.total ? 'text-green-400' : 'text-yellow-400'}`}>
                               {crTotalCalculated}
                           </td>
                       </tr>

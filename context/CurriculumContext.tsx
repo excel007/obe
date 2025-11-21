@@ -19,6 +19,15 @@ const initialState: CurriculumState = {
     nameEN: 'Bachelor of Science Program in Computer Science',
     degreeLevel: 'Bachelor',
     totalCredits: 120,
+    creditStructure: {
+        total: 120,
+        genEd: 30,
+        core: 20,
+        majorReq: 40,
+        majorElec: 24,
+        fieldExp: 0,
+        freeElec: 6
+    }
   },
   stakeholders: [],
   customSources: [],
@@ -49,6 +58,7 @@ interface CurriculumContextType {
   addCourse: (course: Course) => void;
   updateCourse: (id: string, data: Partial<Course>) => void;
   assignCourseToPlan: (courseId: string, year: number, semester: number) => void;
+  removeCourseFromPlan: (courseId: string) => void;
   toggleMapping: (type: 'course-ylo' | 'ylo-plo' | 'course-plo', id1: string, id2: string, forceValue?: boolean) => void;
   togglePLOSource: (ploId: string, sourceId: string) => void;
   addStakeholder: (s: StakeholderInput) => void;
@@ -64,7 +74,20 @@ export const CurriculumProvider = ({ children }: React.PropsWithChildren<{}>) =>
   const [currentStep, setCurrentStep] = useState<Step>('IDENTITY');
 
   const loadState = (newState: CurriculumState) => {
-    setState(newState);
+    // Ensure backward compatibility if imported JSON doesn't have creditStructure
+    const mergedState = {
+        ...initialState,
+        ...newState,
+        info: {
+            ...initialState.info,
+            ...newState.info,
+            creditStructure: {
+                ...initialState.info.creditStructure,
+                ...(newState.info?.creditStructure || {})
+            }
+        }
+    };
+    setState(mergedState);
   };
 
   const clearState = () => {
@@ -133,6 +156,16 @@ export const CurriculumProvider = ({ children }: React.PropsWithChildren<{}>) =>
 
       return { ...prev, studyPlan: newPlan };
     });
+  };
+
+  const removeCourseFromPlan = (courseId: string) => {
+    setState(prev => ({
+        ...prev,
+        studyPlan: prev.studyPlan.map(slot => ({
+            ...slot,
+            courseIds: slot.courseIds.filter(id => id !== courseId)
+        }))
+    }));
   };
 
   const toggleMapping = (type: 'course-ylo' | 'ylo-plo' | 'course-plo', id1: string, id2: string, forceValue?: boolean) => {
@@ -208,6 +241,7 @@ export const CurriculumProvider = ({ children }: React.PropsWithChildren<{}>) =>
       addCourse,
       updateCourse,
       assignCourseToPlan,
+      removeCourseFromPlan,
       toggleMapping,
       togglePLOSource,
       addStakeholder,

@@ -9,6 +9,7 @@ import StepMapping from './components/StepMapping';
 import StepRelations from './components/StepRelations';
 import StepModules from './components/StepModules';
 import StepNeedsMapping from './components/StepNeedsMapping';
+import StepCourseReport from './components/StepCourseReport';
 import { Modal, Button } from './components/ui/Elements';
 import { Step } from './types';
 
@@ -21,6 +22,7 @@ const STEPS: { id: Step; label: string; icon: string }[] = [
   { id: 'MAPPING', label: '6. ความสัมพันธ์ PLO/CLO', icon: '🔗' },
   { id: 'RELATIONS', label: '7. ความสัมพันธ์ PLO/YLO', icon: '🕸' },
   { id: 'MODULES', label: '8. จัดชุดวิชา (Modules)', icon: '📦' },
+  { id: 'REPORT', label: '9. รายงานรายวิชา (Report)', icon: '🖨' },
 ];
 
 function App() {
@@ -39,6 +41,7 @@ function App() {
       case 'MAPPING': return <StepMapping />;
       case 'RELATIONS': return <StepRelations />;
       case 'MODULES': return <StepModules />;
+      case 'REPORT': return <StepCourseReport />;
       default: return <StepIdentity />;
     }
   };
@@ -97,14 +100,14 @@ function App() {
       
       {/* Mobile Header & Overlay */}
       {isSidebarOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)}></div>
       )}
 
       {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col h-full
         transform transition-transform duration-300 ease-in-out
-        md:relative md:translate-x-0
+        md:relative md:translate-x-0 print:hidden
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
@@ -156,9 +159,9 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full print:h-auto print:overflow-visible">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-10">
+        <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-10 print:hidden">
             <div className="flex items-center gap-4">
                 <button 
                     className="md:hidden text-slate-600 hover:text-slate-900"
@@ -174,8 +177,8 @@ function App() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-4 md:p-6 scroll-smooth">
-            <div className="max-w-7xl mx-auto pb-10">
+        <div className="flex-1 overflow-auto p-4 md:p-6 scroll-smooth print:p-0 print:overflow-visible">
+            <div className="max-w-7xl mx-auto pb-10 print:max-w-none print:pb-0">
                 {renderStep()}
             </div>
         </div>

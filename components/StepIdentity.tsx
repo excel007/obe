@@ -39,6 +39,21 @@ const StepIdentity = () => {
       }
   };
 
+  const handleCreditStructureChange = (field: keyof typeof state.info.creditStructure, value: string) => {
+      const numVal = parseInt(value) || 0;
+      updateInfo({
+          creditStructure: {
+              ...state.info.creditStructure,
+              [field]: numVal
+          }
+      });
+      // Also update total credits if 'total' field changes, or calculate it? 
+      // Requirement implies separate inputs.
+      if(field === 'total') {
+          updateInfo({ totalCredits: numVal });
+      }
+  };
+
   return (
     <div className="space-y-6">
       <Card title="1. ข้อมูลทั่วไปของหลักสูตร (Curriculum Identity)">
@@ -62,9 +77,62 @@ const StepIdentity = () => {
             label="จำนวนหน่วยกิตรวม (Total Credits)" 
             type="number"
             value={state.info.totalCredits} 
-            onChange={(e: any) => updateInfo({ totalCredits: parseInt(e.target.value) })} 
+            onChange={(e: any) => handleCreditStructureChange('total', e.target.value)} 
           />
         </div>
+      </Card>
+
+      <Card title="โครงสร้างหลักสูตร (Standard Credit Structure)">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h4 className="font-bold text-slate-700 mb-2">1. หมวดวิชาศึกษาทั่วไป</h4>
+                  <Input 
+                    type="number" 
+                    value={state.info.creditStructure?.genEd} 
+                    onChange={(e: any) => handleCreditStructureChange('genEd', e.target.value)} 
+                  />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h4 className="font-bold text-slate-700 mb-2">2.1 กลุ่มวิชาพื้นฐานวิชาชีพ</h4>
+                  <Input 
+                    type="number" 
+                    value={state.info.creditStructure?.core} 
+                    onChange={(e: any) => handleCreditStructureChange('core', e.target.value)} 
+                  />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h4 className="font-bold text-slate-700 mb-2">2.2.1 กลุ่มวิชาบังคับ</h4>
+                  <Input 
+                    type="number" 
+                    value={state.info.creditStructure?.majorReq} 
+                    onChange={(e: any) => handleCreditStructureChange('majorReq', e.target.value)} 
+                  />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h4 className="font-bold text-slate-700 mb-2">2.2.2 กลุ่มวิชาเลือก</h4>
+                  <Input 
+                    type="number" 
+                    value={state.info.creditStructure?.majorElec} 
+                    onChange={(e: any) => handleCreditStructureChange('majorElec', e.target.value)} 
+                  />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h4 className="font-bold text-slate-700 mb-2">2.2.3 ฝึกประสบการณ์ฯ</h4>
+                  <Input 
+                    type="number" 
+                    value={state.info.creditStructure?.fieldExp} 
+                    onChange={(e: any) => handleCreditStructureChange('fieldExp', e.target.value)} 
+                  />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h4 className="font-bold text-slate-700 mb-2">2.3 หมวดวิชาเลือกเสรี</h4>
+                  <Input 
+                    type="number" 
+                    value={state.info.creditStructure?.freeElec} 
+                    onChange={(e: any) => handleCreditStructureChange('freeElec', e.target.value)} 
+                  />
+              </div>
+          </div>
       </Card>
 
       <Card title="2. ความต้องการของผู้มีส่วนได้ส่วนเสีย (Stakeholder Needs)">

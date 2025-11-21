@@ -268,4 +268,45 @@ export const suggestModuleCourses = async (
     console.error("AI Module Suggestion Error:", error);
     return [];
   }
-}
+};
+
+// --- 6. Smart PLO Mapping (Auto-Mapping) ---
+export const suggestSmartMapping = async (
+    courses: Partial<Course>[], 
+    plos: PLO[]
+): Promise<{ courseId: string, ploIds: string[] }[]> => {
+    const prompt = `
+      Task: Map the following courses to the most relevant PLOs based on their names/descriptions.
+      
+      PLOs: 
+      ${JSON.stringify(plos.map(p => ({ id: p.id, code: p.code, desc: p.description })))}
+      
+      Courses to Map:
+      ${JSON.stringify(courses.map(c => ({ id: c.id, name: c.nameTH, desc: c.descriptionTH })))}
+      
+      Instructions:
+      - For each course, select 1-3 PLO IDs that it best fulfills.
+      - Be strict: Only map if there is a clear alignment.
+      
+      Output Schema (JSON Array):
+      [
+        { "courseId": "ID_1", "ploIds": ["PLO_ID_A", "PLO_ID_B"] },
+        ...
+      ]
+    `;
+  
+    try {
+      const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      }));
+  
+      const text = response.text;
+      const parsed = JSON.parse(cleanJSON(text || "[]"));
+      return extractArray(parsed);
+    } catch (error) {
+      console.error("AI Smart Mapping Error:", error);
+      return [];
+    }
+  };
